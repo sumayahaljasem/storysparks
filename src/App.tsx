@@ -146,6 +146,7 @@ export default function App() {
   const [pageIdx, setPageIdx] = useState(0);
   const [viewStory, setViewStory] = useState<Story|null>(null);
   const [viewIdx, setViewIdx] = useState(0);
+  const [autoListen, setAutoListen] = useState(false);
   const [prevScreen, setPrevScreen] = useState<Screen>("library");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentWordIdx, setCurrentWordIdx] = useState(-1);
@@ -1220,24 +1221,42 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
     );
   }
 
+  // Auto-play audio in listen mode when page changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (autoListen && viewStory && viewStory.pages[viewIdx]) {
+      const lang = viewStory.lang || "en";
+      const text = viewStory.pages[viewIdx].text;
+      if (text) {
+        // Small delay to let the page render first
+        const timer = setTimeout(() => speakEL(text, lang), 200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [viewIdx, viewStory, autoListen]);
+
   // ─── Book viewer with karaoke ───
   if (viewStory) {
     const si=stories.findIndex(s=>s.id===viewStory.id);const pi=pal(si>=0?si:0);const pg=viewStory.pages[viewIdx];const vLang=viewStory.lang||"en";const vRTL=vLang==="ar";
     return (
       <div className="shell">
         <div className="topbar" style={{background:pi.bg}}>
-          <button className="icon-btn" onClick={()=>{stopSpeaking();setViewStory(null);}} style={{color:pi.text}}><Back/></button>
+          <button className="icon-btn" onClick={()=>{stopSpeaking();setAutoListen(false);setViewStory(null);}} style={{color:pi.text}}><Back/></button>
           <div className="topbar-title" style={{color:pi.text}}>{viewStory.title}</div>
-          <button className="icon-btn" onClick={()=>isSpeaking?stopSpeaking():speakEL(pg?.text||"",vLang)} style={{color:pi.accent}}>{isSpeaking?<Stop/>:<Speaker s={24}/>}</button>
+          <button className="icon-btn" onClick={()=>{if(isSpeaking){stopSpeaking();setAutoListen(false);}else{setAutoListen(true);speakEL(pg?.text||"",vLang);}}} style={{color:pi.accent}}>{isSpeaking?<Stop/>:<Speaker s={24}/>}</button>
         </div>
         <div className="body center-col" style={vRTL?{direction:"rtl"}:undefined}>
           {pg?.imageUrl&&<div className="page-img"><img src={pg.imageUrl} alt=""/></div>}
-          <KaraokeText text={pg?.text||""} isReading={isKaraokeActive} currentWordIndex={currentWordIdx} accentColor={pi.accent}/>
+          {autoListen ? (
+            <KaraokeText text={pg?.text||""} isReading={isKaraokeActive} currentWordIndex={currentWordIdx} accentColor={pi.accent}/>
+          ) : (
+            <div className="page-text" style={{fontSize:20,lineHeight:2,textAlign:"center",padding:"20px 8px",maxWidth:420,color:"#1C1917",fontFamily:"var(--font)"}}>{pg?.text||""}</div>
+          )}
           <div className="page-num" style={{color:pi.accent,direction:"ltr"}}>{viewIdx+1} / {viewStory.pages.length}</div>
         </div>
         <div className="bottom-bar">
           <button className="big-btn" disabled={viewIdx===0} onClick={()=>{stopSpeaking();setViewIdx(i=>i-1);}} style={{background:pi.light,color:pi.text}}><ChevL/> {vRTL?"رجوع":"Back"}</button>
-          <button className="big-btn" onClick={()=>isSpeaking?stopSpeaking():speakEL(pg?.text||"",vLang)} style={{background:pi.bg,color:pi.text}}>{isSpeaking?<><Stop/> {vRTL?"توقف":"Stop"}</>:<><Speaker s={26}/> {vRTL?"استمع":"Listen"}</>}</button>
+          <button className="big-btn" onClick={()=>{if(autoListen){stopSpeaking();setAutoListen(false);}else{setAutoListen(true);speakEL(pg?.text||"",vLang);}}} style={{background:autoListen?pi.accent:pi.bg,color:autoListen?"#fff":pi.text}}>{autoListen?<><Stop/> {vRTL?"إيقاف الصوت":"Sound off"}</>:<><Speaker s={22}/> {vRTL?"تشغيل الصوت":"Sound on"}</>}</button>
           <button className="big-btn" onClick={()=>downloadPDF(viewStory.title,viewStory.pages,viewStory.lang||"en")} style={{background:"#DBEAFE",color:"#1E3A5F"}}><DL s={20}/> PDF</button>
           <button className="big-btn" disabled={viewIdx===viewStory.pages.length-1} onClick={()=>{stopSpeaking();setViewIdx(i=>i+1);}} style={{background:pi.light,color:pi.text}}>{vRTL?"التالي":"Next"} <ChevR/></button>
         </div>
@@ -1266,9 +1285,9 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
           <div className="grid">
             <button className="card new-card" onClick={startNew}><Plus/><span>New story</span></button>
             {stories.map((s,i)=>{const p=pal(i);return(
-              <button key={s.id} className="card story-card" style={{background:p.bg}} onClick={()=>{setViewStory(s);setViewIdx(0);}}>
+              <button key={s.id} className="card story-card" style={{background:p.bg}} onClick={()=>{setAutoListen(false);setViewStory(s);setViewIdx(0);}}>
                 <Book s={32}/><div className="card-title" style={{color:p.text}}>{s.title}</div><div className="card-sub" style={{color:p.accent}}>{s.pages.length} pages</div>
-                <div className="card-btns"><span className="card-chip" style={{background:p.light,color:p.text}} onClick={e=>{e.stopPropagation();setViewStory(s);setViewIdx(0);}}><Book s={16}/> Read</span><span className="card-chip" style={{background:p.light,color:p.text}} onClick={e=>{e.stopPropagation();speakEL(s.pages.map(pg=>pg.text).join(". "),s.lang||"en");}}><Speaker s={16}/> Listen</span></div>
+                <div className="card-btns"><span className="card-chip" style={{background:p.light,color:p.text}} onClick={e=>{e.stopPropagation();setAutoListen(false);setViewStory(s);setViewIdx(0);}}><Book s={16}/> Read</span><span className="card-chip" style={{background:p.light,color:p.text}} onClick={e=>{e.stopPropagation();setAutoListen(true);setViewStory(s);setViewIdx(0);}}><Speaker s={16}/> Listen</span></div>
               </button>);})}
           </div>
         </div>
