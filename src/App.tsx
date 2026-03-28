@@ -163,6 +163,7 @@ export default function App() {
   });
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [testingVoice, setTestingVoice] = useState<string|null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showAllVoices, setShowAllVoices] = useState(false);
 
   // API key management
