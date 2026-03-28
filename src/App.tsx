@@ -134,7 +134,7 @@ async function loadImagesFromIDB(): Promise<Record<string, string>> {
 export default function App() {
   const [screen, setScreen] = useState<Screen>("library");
   const [stories, setStories] = useState<Story[]>(()=>{
-    const s=localStorage.getItem("ss_stories");return s?JSON.parse(s):[];
+    try{const s=localStorage.getItem("ss_stories");return s?JSON.parse(s):[];}catch{return [];}
   });
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -158,8 +158,7 @@ export default function App() {
   const [questionTranscript, setQuestionTranscript] = useState("");
 
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>(()=>{
-    const s=localStorage.getItem("ss_voice2");
-    if(s){const p=JSON.parse(s);if(p.speed>0.8)p.speed=0.7;return p;}
+    try{const s=localStorage.getItem("ss_voice2");if(s){const p=JSON.parse(s);if(p.speed>0.8)p.speed=0.7;return p;}}catch{}
     return {speed:0.7,pitch:1.05};
   });
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -168,32 +167,32 @@ export default function App() {
   const [showAllVoices, setShowAllVoices] = useState(false);
 
   // API key management
-  const [apiKey, setApiKey] = useState<string>(()=>localStorage.getItem("ss_api_key")||"");
+  const [apiKey, setApiKey] = useState<string>(()=>{try{return localStorage.getItem("ss_api_key")||"";}catch{return "";}});
   const [apiKeyInput, setApiKeyInput] = useState("");
-  const saveApiKey = (key: string) => { setApiKey(key); localStorage.setItem("ss_api_key", key); };
+  const saveApiKey = (key: string) => { setApiKey(key); try{localStorage.setItem("ss_api_key", key);}catch{} };
 
   // ElevenLabs
-  const [elKey, setElKey] = useState<string>(()=>localStorage.getItem("ss_el_key")||"");
+  const [elKey, setElKey] = useState<string>(()=>{try{return localStorage.getItem("ss_el_key")||"";}catch{return "";}});
   const [elKeyInput, setElKeyInput] = useState("");
-  const saveElKey = (key: string) => { setElKey(key); localStorage.setItem("ss_el_key", key); };
+  const saveElKey = (key: string) => { setElKey(key); try{localStorage.setItem("ss_el_key", key);}catch{} };
   const elAudioRef = useRef<HTMLAudioElement|null>(null);
   const elTimerRef = useRef<number|null>(null);
 
   // Default ElevenLabs voice IDs (good multilingual voices)
-  const [elVoiceEn, setElVoiceEn] = useState<string>(()=>localStorage.getItem("ss_el_voice_en")||"EXAVITQu4vr4xnSDxMaL"); // Sarah - warm storytelling
-  const [elVoiceAr, setElVoiceAr] = useState<string>(()=>localStorage.getItem("ss_el_voice_ar")||"TX3LPaxmHKxFdv7VOQHJ"); // Liam - multilingual
-  useEffect(()=>{localStorage.setItem("ss_el_voice_en",elVoiceEn);},[elVoiceEn]);
-  useEffect(()=>{localStorage.setItem("ss_el_voice_ar",elVoiceAr);},[elVoiceAr]);
+  const [elVoiceEn, setElVoiceEn] = useState<string>(()=>{try{return localStorage.getItem("ss_el_voice_en")||"EXAVITQu4vr4xnSDxMaL";}catch{return "EXAVITQu4vr4xnSDxMaL";}});
+  const [elVoiceAr, setElVoiceAr] = useState<string>(()=>{try{return localStorage.getItem("ss_el_voice_ar")||"TX3LPaxmHKxFdv7VOQHJ";}catch{return "TX3LPaxmHKxFdv7VOQHJ";}});
+  useEffect(()=>{try{localStorage.setItem("ss_el_voice_en",elVoiceEn);}catch{}},[elVoiceEn]);
+  useEffect(()=>{try{localStorage.setItem("ss_el_voice_ar",elVoiceAr);}catch{}},[elVoiceAr]);
 
   // Gemini (image generation)
-  const [geminiKey, setGeminiKey] = useState<string>(()=>localStorage.getItem("ss_gemini_key")||"");
+  const [geminiKey, setGeminiKey] = useState<string>(()=>{try{return localStorage.getItem("ss_gemini_key")||"";}catch{return "";}});
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
-  const saveGeminiKey = (key: string) => { setGeminiKey(key); localStorage.setItem("ss_gemini_key", key); };
+  const saveGeminiKey = (key: string) => { setGeminiKey(key); try{localStorage.setItem("ss_gemini_key", key);}catch{} };
 
   // OpenAI Whisper (transcription)
-  const [openaiKey, setOpenaiKey] = useState<string>(()=>localStorage.getItem("ss_openai_key")||"");
+  const [openaiKey, setOpenaiKey] = useState<string>(()=>{try{return localStorage.getItem("ss_openai_key")||"";}catch{return "";}});
   const [openaiKeyInput, setOpenaiKeyInput] = useState("");
-  const saveOpenaiKey = (key: string) => { setOpenaiKey(key); localStorage.setItem("ss_openai_key", key); };
+  const saveOpenaiKey = (key: string) => { setOpenaiKey(key); try{localStorage.setItem("ss_openai_key", key);}catch{} };
   const mediaRecRef = useRef<MediaRecorder|null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const liveIntervalRef = useRef<any>(null);
@@ -265,7 +264,7 @@ export default function App() {
     return (data.content?.[0]?.text || "{}").replace(/```json|```/g, "").trim();
   };
 
-  useEffect(()=>{localStorage.setItem("ss_voice2",JSON.stringify(voiceConfig));},[voiceConfig]);
+  useEffect(()=>{try{localStorage.setItem("ss_voice2",JSON.stringify(voiceConfig));}catch{}},[voiceConfig]);
   // Save stories to localStorage (text only) + IndexedDB (images)
   useEffect(()=>{
     // Strip images for localStorage (5MB limit) — save only text data
@@ -301,7 +300,7 @@ export default function App() {
   useEffect(()=>{
     if (!window.speechSynthesis) return; // Guard for browsers without speechSynthesis
     const load=()=>{try{const all=window.speechSynthesis.getVoices();const en=all.filter(v=>v.lang.startsWith("en"));const list=en.length>0?en:all;list.sort((a,b)=>scoreVoice(b)-scoreVoice(a));setBrowserVoices(list);if(!voiceConfig.voiceURI&&list.length>0)setVoiceConfig(vc=>({...vc,voiceURI:list[0].voiceURI,voiceName:list[0].name}));}catch(e){console.error("Voice load error:",e);}};
-    load();window.speechSynthesis.onvoiceschanged=load;
+    load();try{window.speechSynthesis.onvoiceschanged=load;}catch(e){console.error("voiceschanged error:",e);}
   },[]);
 
   // ─── Speak with karaoke ───
@@ -335,12 +334,12 @@ export default function App() {
 
     u.onend = () => { setIsSpeaking(false); setIsKaraokeActive(false); setCurrentWordIdx(-1); onEnd?.(); };
     u.onerror = () => { setIsSpeaking(false); setIsKaraokeActive(false); setCurrentWordIdx(-1); onEnd?.(); };
-    window.speechSynthesis.speak(u);
+    if (window.speechSynthesis) window.speechSynthesis.speak(u);
   }, [voiceConfig, browserVoices]);
 
   // Simple speak without karaoke (for short UI prompts)
   const speakSimple = useCallback((text: string, onEnd?: () => void) => {
-    window.speechSynthesis.cancel();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (!text) return;
     setIsSpeaking(true);
     const u = new SpeechSynthesisUtterance(text);
@@ -348,7 +347,7 @@ export default function App() {
     if (voiceConfig.voiceURI) { const m = browserVoices.find(v=>v.voiceURI===voiceConfig.voiceURI); if(m) u.voice=m; }
     u.onend = () => { setIsSpeaking(false); onEnd?.(); };
     u.onerror = () => { setIsSpeaking(false); onEnd?.(); };
-    window.speechSynthesis.speak(u);
+    if (window.speechSynthesis) window.speechSynthesis.speak(u);
   }, [voiceConfig, browserVoices]);
 
   const stopSpeaking = useCallback(() => {
@@ -482,6 +481,7 @@ export default function App() {
   }, [speakEL]);
 
   const testVoice = useCallback((v: SpeechSynthesisVoice) => {
+    if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel(); setTestingVoice(v.voiceURI);
     const u = new SpeechSynthesisUtterance(TEST_PHRASES[Math.floor(Math.random()*TEST_PHRASES.length)]);
     u.voice=v; u.rate=voiceConfig.speed; u.pitch=voiceConfig.pitch;
@@ -498,7 +498,7 @@ export default function App() {
     if (!openaiKey) { speakEL("Please add your OpenAI key in settings first.", storyLang); return; }
 
     // Stop any ongoing speech first
-    window.speechSynthesis.cancel();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     setIsSpeaking(false);
 
     // 3-2-1 countdown then start
@@ -707,7 +707,7 @@ The child's story so far: ${allInput || "nothing yet"}`,
     if (!openaiKey) { speakEL("Please add your OpenAI key in settings first.", storyLang); return; }
 
     // Stop any TTS first
-    window.speechSynthesis.cancel();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     setIsSpeaking(false);
 
     setAnsweringQuestion(qId);
