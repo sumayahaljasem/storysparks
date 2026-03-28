@@ -389,25 +389,45 @@ export default function App() {
       const audio = new Audio(url);
       elAudioRef.current = audio;
 
-      // Estimate word timing from audio duration
+      // Estimate word timing from audio duration using syllable-based weights
       const words = text.split(/\s+/);
       const wordTimings: { start: number; end: number }[] = [];
 
-      // Sync karaoke during playback
-      // Build word timings once we know audio duration
+      // Count syllables in a word (approximate)
+      const countSyllables = (word: string): number => {
+        const w = word.toLowerCase().replace(/[^a-z]/g, "");
+        if (w.length <= 2) return 1;
+        let count = 0;
+        const vowels = "aeiouy";
+        let prevVowel = false;
+        for (let i = 0; i < w.length; i++) {
+          const isVowel = vowels.includes(w[i]);
+          if (isVowel && !prevVowel) count++;
+          prevVowel = isVowel;
+        }
+        // Silent e
+        if (w.endsWith("e") && count > 1) count--;
+        return Math.max(1, count);
+      };
+
       const buildTimings = () => {
-        const dur = audio.duration || (words.length * 0.5);
-        // Better timing: base time per word + small bonus for longer words + pause after punctuation
+        const dur = audio.duration || (words.length * 0.4);
+        // ElevenLabs has ~0.15s lead-in silence
+        const leadIn = Math.min(0.15, dur * 0.05);
+        const speechDur = dur - leadIn;
+
+        // Weight each word by syllable count + pause after punctuation
         const weights = words.map(w => {
-          let wt = 1.0; // base weight per word
-          wt += Math.min(w.length, 8) * 0.08; // slight bonus for longer words (capped)
-          if (/[.,;!?]$/.test(w)) wt += 0.4; // pause after punctuation
+          let wt = countSyllables(w);
+          // Add pause time after sentence-ending punctuation
+          if (/[.!?]$/.test(w)) wt += 1.5;
+          else if (/[,;:]$/.test(w)) wt += 0.6;
           return wt;
         });
         const totalWeight = weights.reduce((a,b) => a+b, 0) || 1;
-        let cursor = 0;
+        let cursor = leadIn;
         for (const wt of weights) {
-          const wordDur = (wt / totalWeight) * dur;
+          const wordDur = (wt / totalWeight) * speechDur;
           wordTimings.push({ start: cursor, end: cursor + wordDur });
           cursor += wordDur;
         }
