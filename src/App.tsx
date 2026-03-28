@@ -357,7 +357,8 @@ export default function App() {
 
   // ─── ElevenLabs TTS with karaoke ───
   const speakEL = useCallback(async (text: string, lang: StoryLang, onEnd?: () => void) => {
-    if (!elKey || !text) { /* fall back to browser TTS */ speak(text, onEnd); return; }
+    if (!text) { onEnd?.(); return; }
+    if (!elKey) { /* No ElevenLabs key — skip voice */ onEnd?.(); return; }
     stopSpeaking();
     setIsSpeaking(true);
     setIsKaraokeActive(true);
@@ -378,7 +379,8 @@ export default function App() {
       if (!res.ok) {
         const errText = await res.text().catch(()=>"");
         console.error("ElevenLabs error", res.status, errText);
-        speak(text, onEnd);
+        setIsSpeaking(false); setIsKaraokeActive(false); setCurrentWordIdx(-1);
+        onEnd?.();
         return;
       }
 
@@ -1051,8 +1053,8 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
             />
             <button onClick={()=>{
               const key=(apiKeyInput||apiKey).trim();
-              if(key.startsWith("sk-")){saveApiKey(key);setApiKeyInput("");speakSimple("Claude connected!");}
-              else{speakSimple("That doesn't look right. The key should start with s k.");}
+              if(key.startsWith("sk-")){saveApiKey(key);setApiKeyInput("");}
+              else{/* invalid key, no speech */}
             }} style={{width:"100%",marginTop:10,padding:"14px",borderRadius:14,border:"none",background:"#2563EB",color:"#fff",fontFamily:"var(--font)",fontSize:15,fontWeight:600,cursor:"pointer"}}>
               {apiKey?"Update":"Save"}
             </button>
@@ -1068,8 +1070,8 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
             />
             <button onClick={()=>{
               const key=(elKeyInput||elKey).trim();
-              if(key.length>10){saveElKey(key);setElKeyInput("");speakSimple("ElevenLabs connected! Premium voices are ready.");}
-              else{speakSimple("That key looks too short.");}
+              if(key.length>10){saveElKey(key);setElKeyInput("");}
+              else{/* invalid key, no speech */}
             }} style={{width:"100%",marginTop:10,padding:"14px",borderRadius:14,border:"none",background:"#EA580C",color:"#fff",fontFamily:"var(--font)",fontSize:15,fontWeight:600,cursor:"pointer"}}>
               {elKey?"Update":"Save"}
             </button>
@@ -1125,7 +1127,7 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
         <div className="topbar" style={{background:"#F5F3FF"}}>
           <button className="icon-btn" onClick={()=>{stopSpeaking();setScreen(prevScreen);}} style={{color:"#4C1D95"}}><Back/></button>
           <div className="topbar-title" style={{color:"#4C1D95"}}><Gear s={20}/> Voice settings</div>
-          <button className="icon-btn" onClick={()=>speakSimple("Pick a voice and adjust the speed!")} style={{color:"#7C3AED"}}><Speaker s={24}/></button>
+          <button className="icon-btn" onClick={()=>speakEL("Pick a voice and adjust the speed!","en")} style={{color:"#7C3AED"}}><Speaker s={24}/></button>
         </div>
         <div className="body" style={{padding:20}}>
           <div className="settings-section">
@@ -1289,32 +1291,19 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
             {!isRecording&&listenStatus&&<div className="bubble active" style={{textAlign:"center",color:"#78716C",fontSize:15}}>{listenStatus}</div>}
             {editingTranscript!==null&&!isRecording&&(
               <div className="bubble active" style={{padding:0,border:"2px solid #059669",background:"#ECFDF5"}}>
-                {isSpeaking ? (
-                  /* Karaoke preview while listening */
-                  <div style={{padding:"14px 18px 8px",direction:storyLang==="ar"?"rtl":"ltr",textAlign:storyLang==="ar"?"right":"left"}} className="karaoke-edit-preview">
-                    <KaraokeText text={editingTranscript} isReading={isKaraokeActive} currentWordIndex={currentWordIdx} accentColor="#059669"/>
-                  </div>
-                ) : (
-                  /* Editable textarea when not listening */
-                  <textarea
-                    ref={el=>{editRef.current=el;if(el){el.style.height="auto";el.style.height=el.scrollHeight+"px";}}}
-                    value={editingTranscript}
-                    onChange={e=>{setEditingTranscript(e.target.value);const t=e.target;t.style.height="auto";t.style.height=t.scrollHeight+"px";}}
-                    autoFocus
-                    style={{
-                      width:"100%",padding:"14px 18px",border:"none",background:"transparent",
-                      fontFamily:"var(--font)",fontSize:17,lineHeight:1.55,color:"#064E3B",
-                      resize:"none",minHeight:60,outline:"none",overflow:"hidden",
-                      direction:storyLang==="ar"?"rtl":"ltr",textAlign:storyLang==="ar"?"right":"left",
-                    }}
-                  />
-                )}
+                <textarea
+                  ref={el=>{editRef.current=el;if(el){el.style.height="auto";el.style.height=el.scrollHeight+"px";}}}
+                  value={editingTranscript}
+                  onChange={e=>{setEditingTranscript(e.target.value);const t=e.target;t.style.height="auto";t.style.height=t.scrollHeight+"px";}}
+                  autoFocus
+                  style={{
+                    width:"100%",padding:"14px 18px",border:"none",background:"transparent",
+                    fontFamily:"var(--font)",fontSize:17,lineHeight:1.55,color:"#064E3B",
+                    resize:"none",minHeight:60,outline:"none",overflow:"hidden",
+                    direction:storyLang==="ar"?"rtl":"ltr",textAlign:storyLang==="ar"?"right":"left",
+                  }}
+                />
                 <div style={{display:"flex",gap:8,padding:"8px 14px 12px"}}>
-                  <button onClick={()=>isSpeaking?stopSpeaking():speakEL(editingTranscript,storyLang)} style={{
-                    padding:"12px 16px",borderRadius:12,border:"none",background:"#D1FAE5",color:"#064E3B",
-                    fontFamily:"var(--font)",fontSize:15,fontWeight:500,cursor:"pointer",
-                    display:"flex",alignItems:"center",gap:6,
-                  }}>{isSpeaking?<><Stop/> Stop</>:<><Speaker s={20}/> Listen</>}</button>
                   <button onClick={submitEditedTranscript} style={{
                     flex:1,padding:"12px",borderRadius:12,border:"none",background:"#059669",color:"#fff",
                     fontFamily:"var(--font)",fontSize:15,fontWeight:600,cursor:"pointer",
