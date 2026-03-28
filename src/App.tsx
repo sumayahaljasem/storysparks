@@ -303,6 +303,19 @@ export default function App() {
     load();try{window.speechSynthesis.onvoiceschanged=load;}catch(e){console.error("voiceschanged error:",e);}
   },[]);
 
+  // Auto-play audio in listen mode when page changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (autoListen && viewStory && viewStory.pages[viewIdx]) {
+      const lang = viewStory.lang || "en";
+      const text = viewStory.pages[viewIdx].text;
+      if (text) {
+        const timer = setTimeout(() => speakEL(text, lang), 200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [viewIdx, viewStory, autoListen]);
+
   // ─── Speak with karaoke ───
   const speak = useCallback((text: string, onEnd?: () => void) => {
     if (!window.speechSynthesis) { onEnd?.(); return; }
@@ -1217,20 +1230,6 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
       </div>
     );
   }
-
-  // Auto-play audio in listen mode when page changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (autoListen && viewStory && viewStory.pages[viewIdx]) {
-      const lang = viewStory.lang || "en";
-      const text = viewStory.pages[viewIdx].text;
-      if (text) {
-        // Small delay to let the page render first
-        const timer = setTimeout(() => speakEL(text, lang), 200);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [viewIdx, viewStory, autoListen]);
 
   // ─── Book viewer with karaoke ───
   if (viewStory) {
