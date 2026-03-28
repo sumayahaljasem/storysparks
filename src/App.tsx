@@ -1125,7 +1125,7 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
     return (
       <div className="shell">
         <div className="topbar" style={{background:"#F5F3FF"}}>
-          <button className="icon-btn" onClick={()=>{stopSpeaking();setScreen(prevScreen);}} style={{color:"#4C1D95"}}><Back/></button>
+          <button className="icon-btn" onClick={()=>{stopSpeaking();setScreen("library");}} style={{color:"#4C1D95"}}><Back/></button>
           <div className="topbar-title" style={{color:"#4C1D95"}}><Gear s={20}/> Voice settings</div>
           <button className="icon-btn" onClick={()=>speakEL("Pick a voice and adjust the speed!","en")} style={{color:"#7C3AED"}}><Speaker s={24}/></button>
         </div>
