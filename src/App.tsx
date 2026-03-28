@@ -510,19 +510,22 @@ export default function App() {
         setIsRecording(false);
       };
 
-      // Collect chunks every 500ms for smooth recording
-      recorder.start(500);
+      // Collect chunks every 300ms for smooth recording
+      recorder.start(300);
 
-      // Live transcription: send accumulated audio to Whisper every 3 seconds
+      // Live transcription: send accumulated audio to Whisper every 2 seconds
+      let liveInFlight = false;
       liveIntervalRef.current = setInterval(async () => {
-        if (audioChunksRef.current.length === 0) return;
+        if (audioChunksRef.current.length === 0 || liveInFlight) return;
         try {
           const blob = new Blob(audioChunksRef.current, { type: mimeType });
-          if (blob.size < 1000) return;
+          if (blob.size < 500) return;
+          liveInFlight = true;
           const text = await transcribeWithWhisper(blob, storyLang);
+          liveInFlight = false;
           if (text.trim()) setTranscript(text.trim());
-        } catch (_) { /* ignore interim errors */ }
-      }, 3000);
+        } catch (_) { liveInFlight = false; /* ignore interim errors */ }
+      }, 2000);
 
     }).catch(err => {
       console.error("Mic access error:", err);
@@ -1280,11 +1283,17 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
           {/* Transcripts — show live words or editing */}
           {(isRecording||transcript||listenStatus||editingTranscript!==null)&&<div className="bubbles">
             {isRecording&&(
-              <div className="bubble active" style={storyLang==="ar"?{direction:"rtl",textAlign:"right"}:undefined}>
+              <div className="bubble active" style={{
+                ...(storyLang==="ar"?{direction:"rtl",textAlign:"right"}:{}),
+                fontSize:transcript?18:15,
+                lineHeight:1.6,
+                color:transcript?"#064E3B":"#059669",
+                minHeight:60,
+              }}>
                 {transcript ? (
-                  <>{transcript}<span className="blink">|</span></>
+                  <>{transcript}<span className="blink" style={{color:"#059669",fontWeight:700}}>|</span></>
                 ) : (
-                  <span style={{color:"#059669",fontSize:15}}>🎙️ Listening...</span>
+                  <span>🎙️ Speak now — your words will appear here...</span>
                 )}
               </div>
             )}
