@@ -1313,6 +1313,11 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
                   }}
                 />
                 <div style={{display:"flex",gap:8,padding:"8px 14px 12px"}}>
+                  <button onClick={()=>isSpeaking?stopSpeaking():speakEL(editingTranscript||"",storyLang)} style={{
+                    padding:"12px 16px",borderRadius:12,border:"none",background:"#D1FAE5",color:"#064E3B",
+                    fontFamily:"var(--font)",fontSize:15,fontWeight:500,cursor:"pointer",
+                    display:"flex",alignItems:"center",gap:6,
+                  }}>{isSpeaking?<><Stop/> Stop</>:<><Speaker s={20}/> Listen</>}</button>
                   <button onClick={submitEditedTranscript} style={{
                     flex:1,padding:"12px",borderRadius:12,border:"none",background:"#059669",color:"#fff",
                     fontFamily:"var(--font)",fontSize:15,fontWeight:600,cursor:"pointer",
