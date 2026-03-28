@@ -1,0 +1,18 @@
+{
+  "name": "Story Sparks",
+  "short_name": "Story Sparks",
+  "description": "Create magical stories with your voice and AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF9",
+  "theme_color": "#7C3AED",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
