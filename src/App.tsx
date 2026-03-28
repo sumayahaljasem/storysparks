@@ -958,99 +958,94 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
   };
 
   // ─── Download story as PDF ───
+  // Render text on a canvas (supports Arabic/RTL natively) and return as data URL
+  const renderTextToImage = (text: string, opts: {
+    fontSize?: number; color?: string; maxWidth: number;
+    align?: "center"|"left"|"right"; isRTL?: boolean; bold?: boolean;
+  }): string => {
+    const { fontSize = 14, color = "#323232", maxWidth, align = "left", isRTL = false, bold = false } = opts;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    const scale = 3;
+    const font = `${bold ? "bold " : ""}${fontSize * scale}px ${isRTL ? "'Noto Sans Arabic', 'Arial', sans-serif" : "'Arial', sans-serif"}`;
+    ctx.font = font;
+    // Word-wrap
+    const words = text.split(/\s+/);
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      const test = cur ? cur + " " + w : w;
+      if (ctx.measureText(test).width > maxWidth * scale) { if (cur) lines.push(cur); cur = w; } else { cur = test; }
+    }
+    if (cur) lines.push(cur);
+    const lh = fontSize * scale * 1.6;
+    canvas.width = maxWidth * scale;
+    canvas.height = lines.length * lh + fontSize * scale;
+    ctx.font = font; ctx.fillStyle = color; ctx.textBaseline = "top";
+    if (isRTL) ctx.direction = "rtl";
+    lines.forEach((line, i) => {
+      const y = i * lh;
+      const w = ctx.measureText(line).width;
+      if (align === "center") ctx.fillText(line, (canvas.width - w) / 2, y);
+      else if (align === "right" || isRTL) ctx.fillText(line, canvas.width - w, y);
+      else ctx.fillText(line, 0, y);
+    });
+    return canvas.toDataURL("image/png");
+  };
+
   const downloadPDF = async (title: string, storyPages: {text:string; imageUrl?:string}[], lang: "en"|"ar") => {
     const isRTL = lang === "ar";
-    // A5 size for a storybook feel
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
-    const pageW = doc.internal.pageSize.getWidth();   // 148mm
-    const pageH = doc.internal.pageSize.getHeight();   // 210mm
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
     const margin = 14;
     const contentW = pageW - margin * 2;
 
-    // ── Cover page ──
-    doc.setFillColor(237, 233, 254); // soft purple
-    doc.rect(0, 0, pageW, pageH, "F");
-
-    // Cover image if available
-    if (coverImageUrl) {
+    // Helper: add a rendered text image to PDF
+    const addTextImage = (dataUrl: string, x: number, y: number, maxW: number, maxH: number) => {
       try {
-        const imgW = contentW;
-        const imgH = contentW * 0.75;
-        doc.addImage(coverImageUrl, "JPEG", margin, margin, imgW, imgH);
-      } catch { /* skip */ }
-    }
+        const img = new Image(); img.src = dataUrl;
+        const ratio = img.naturalHeight / img.naturalWidth || 0.3;
+        const h = Math.min(maxW * ratio, maxH);
+        doc.addImage(dataUrl, "PNG", x, y, maxW, h);
+        return h;
+      } catch { return 0; }
+    };
 
-    const coverImgBottom = coverImageUrl ? margin + contentW * 0.75 + 10 : pageH * 0.35;
+    // ── Cover page ──
+    doc.setFillColor(237, 233, 254);
+    doc.rect(0, 0, pageW, pageH, "F");
+    let cy = margin;
+    if (coverImageUrl) {
+      try { const iw = contentW, ih = contentW * 0.75; doc.addImage(coverImageUrl, "JPEG", margin, cy, iw, ih); cy += ih + 10; } catch { /* skip */ }
+    } else { cy = pageH * 0.35; }
 
-    doc.setFontSize(26);
-    doc.setTextColor(76, 29, 149);
-    const titleLines = doc.splitTextToSize(title, contentW);
-    if (isRTL) {
-      titleLines.forEach((line: string, i: number) => {
-        const lineW = doc.getTextWidth(line);
-        doc.text(line, pageW / 2 + lineW / 2, coverImgBottom + i * 12);
-      });
-    } else {
-      doc.text(titleLines, pageW / 2, coverImgBottom, { align: "center" });
-    }
+    // Title (rendered as image for Arabic support)
+    const titleImg = renderTextToImage(title, { fontSize: 26, color: "#4C1D95", maxWidth: contentW, align: "center", isRTL, bold: true });
+    cy += addTextImage(titleImg, margin, cy, contentW, 40) + 5;
 
-    // Author name
-    const authorY = coverImgBottom + titleLines.length * 12 + 8;
+    // Author
     if (authorName) {
-      doc.setFontSize(14);
-      doc.setTextColor(157, 23, 77);
       const byLine = isRTL ? `بقلم: ${authorName}` : `By ${authorName}`;
-      if (isRTL) {
-        const bw = doc.getTextWidth(byLine);
-        doc.text(byLine, pageW / 2 + bw / 2, authorY);
-      } else {
-        doc.text(byLine, pageW / 2, authorY, { align: "center" });
-      }
+      const authImg = renderTextToImage(byLine, { fontSize: 14, color: "#9D174D", maxWidth: contentW, align: "center", isRTL });
+      addTextImage(authImg, margin, cy, contentW * 0.6, 20);
     }
 
     // ── Story pages ──
     for (let i = 0; i < storyPages.length; i++) {
       doc.addPage();
       const pg = storyPages[i];
-      let cursorY = margin;
-
-      // Add image if exists
+      let py = margin;
       if (pg.imageUrl) {
-        try {
-          const imgData = pg.imageUrl;
-          // Calculate image dimensions to fit width with aspect ratio ~4:3
-          const imgW = contentW;
-          const imgH = contentW * 0.75;
-          doc.addImage(imgData, "JPEG", margin, cursorY, imgW, imgH);
-          cursorY += imgH + 8;
-        } catch {
-          // Skip image if it fails to load
-          cursorY += 4;
-        }
+        try { const iw = contentW, ih = contentW * 0.75; doc.addImage(pg.imageUrl, "JPEG", margin, py, iw, ih); py += ih + 8; } catch { py += 4; }
       }
-
-      // Add text
-      doc.setFontSize(14);
-      doc.setTextColor(50, 50, 50);
-      const textLines = doc.splitTextToSize(pg.text, contentW);
-      if (isRTL) {
-        textLines.forEach((line: string, li: number) => {
-          const lineW = doc.getTextWidth(line);
-          const lineY = cursorY + li * 7;
-          if (lineY < pageH - margin) {
-            doc.text(line, pageW - margin, lineY, { align: "right" });
-          }
-        });
-      } else {
-        doc.text(textLines, margin, cursorY, { maxWidth: contentW });
-      }
-
-      // Page number
-      doc.setFontSize(10);
-      doc.setTextColor(160, 160, 160);
+      // Text as image (Arabic-safe)
+      const txtImg = renderTextToImage(pg.text, { fontSize: 14, color: "#323232", maxWidth: contentW, align: isRTL ? "right" : "left", isRTL });
+      addTextImage(txtImg, margin, py, contentW, pageH - py - 15);
+      // Page number (ASCII — safe with default font)
+      doc.setFontSize(10); doc.setTextColor(160, 160, 160);
       doc.text(`${i + 1}`, pageW / 2, pageH - 8, { align: "center" });
     }
-
     doc.save(`${title}.pdf`);
   };
 
