@@ -299,12 +299,14 @@ export default function App() {
     });
   }, []);
   useEffect(()=>{
-    const load=()=>{const all=window.speechSynthesis.getVoices();const en=all.filter(v=>v.lang.startsWith("en"));const list=en.length>0?en:all;list.sort((a,b)=>scoreVoice(b)-scoreVoice(a));setBrowserVoices(list);if(!voiceConfig.voiceURI&&list.length>0)setVoiceConfig(vc=>({...vc,voiceURI:list[0].voiceURI,voiceName:list[0].name}));};
+    if (!window.speechSynthesis) return; // Guard for browsers without speechSynthesis
+    const load=()=>{try{const all=window.speechSynthesis.getVoices();const en=all.filter(v=>v.lang.startsWith("en"));const list=en.length>0?en:all;list.sort((a,b)=>scoreVoice(b)-scoreVoice(a));setBrowserVoices(list);if(!voiceConfig.voiceURI&&list.length>0)setVoiceConfig(vc=>({...vc,voiceURI:list[0].voiceURI,voiceName:list[0].name}));}catch(e){console.error("Voice load error:",e);}};
     load();window.speechSynthesis.onvoiceschanged=load;
   },[]);
 
   // ─── Speak with karaoke ───
   const speak = useCallback((text: string, onEnd?: () => void) => {
+    if (!window.speechSynthesis) { onEnd?.(); return; }
     window.speechSynthesis.cancel();
     if (!text) return;
     setIsSpeaking(true);
@@ -350,7 +352,7 @@ export default function App() {
   }, [voiceConfig, browserVoices]);
 
   const stopSpeaking = useCallback(() => {
-    window.speechSynthesis.cancel();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (elAudioRef.current) { elAudioRef.current.pause(); elAudioRef.current.src = ""; elAudioRef.current = null; }
     if (elTimerRef.current) { cancelAnimationFrame(elTimerRef.current); elTimerRef.current = null; }
     setIsSpeaking(false); setIsKaraokeActive(false); setCurrentWordIdx(-1); setTestingVoice(null);
