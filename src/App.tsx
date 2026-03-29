@@ -857,28 +857,48 @@ ${langInstr} Break into pages of 1-2 sentences each. Short input = fewer pages. 
     });
   };
 
-  const generateOneImage = async (prompt: string): Promise<string> => {
+  const generateOneImage = async (prompt: string, retries = 2): Promise<string> => {
     if (!geminiKey) throw new Error("no-gemini-key");
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ["TEXT","IMAGE"] },
-      }),
-    });
-    if (!res.ok) { const err = await res.text(); console.error("Gemini error", res.status, err); throw new Error("Gemini API error: " + res.status); }
-    const data = await res.json();
-    // Find inline image data in response
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.inlineData) {
-        const rawUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        // Compress to ~100-200KB JPEG
-        return await compressImage(rawUrl);
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ["TEXT","IMAGE"] },
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          console.error("Gemini error", res.status, err);
+          if (attempt < retries && (res.status === 429 || res.status >= 500)) {
+            await new Promise(r => setTimeout(r, 2000 * (attempt + 1))); // wait before retry
+            continue;
+          }
+          throw new Error("Gemini API error: " + res.status);
+        }
+        const data = await res.json();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData) {
+            const rawUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            return await compressImage(rawUrl);
+          }
+        }
+        // If no image but got a response, log what we got
+        console.error("Gemini response has no image:", JSON.stringify(data).slice(0, 500));
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        throw new Error("No image in response");
+      } catch (err) {
+        if (attempt >= retries) throw err;
+        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
       }
     }
-    throw new Error("No image in response");
+    throw new Error("Failed after retries");
   };
 
   const extractCharacterDescription = async () => {
@@ -1665,12 +1685,10 @@ Rules: Children's book illustration. No text, words, or letters anywhere in the 
                     ) : (
                       <>
                         <span>Not generated</span>
-                        {!isProcessing && (
-                          <button onClick={()=>{setRedoingPage(i);setRedoPrompt("");}} style={{
-                            background:"#DB2777",border:"none",borderRadius:10,padding:"8px 14px",
-                            fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"var(--font)",
-                          }}>Generate</button>
-                        )}
+                        <button onClick={()=>{setRedoingPage(i);setRedoPrompt("");}} style={{
+                          background:"#DB2777",border:"none",borderRadius:10,padding:"8px 14px",
+                          fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"var(--font)",
+                        }}>Generate</button>
                       </>
                     )}
                   </div>
